@@ -104,6 +104,7 @@ public class SunshineSyncTask {
                     NotificationUtils.notifyUserOfNewWeather(context);
                 }
 
+                ConnectedDevicesUtil.notifyDevices(context);
             /* If the code reaches this point, we have successfully performed our sync */
 
             }
