@@ -21,6 +21,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -90,15 +92,27 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
         final String FORMAT_AMBIENT = "%02d:%02d";
         final String FORMAT_HOUR = "%02d:";
         final String FORMAT_MINUTE = "%02d";
+
         final Handler mUpdateTimeHandler = new EngineHandler(this);
-        boolean mRegisteredTimeZoneReceiver = false;
+
+        Paint mBitmapPaint;
         Paint mBackgroundPaint;
         Paint mTextPaintBold;
         Paint mTextPaintNormal;
         Paint mTextPaintSecondary;
         Paint mTextPaintAmbient;
+
+        /**
+         * Whether the display supports fewer bits for each color in ambient mode. When true, we
+         * disable anti-aliasing in ambient mode.
+         */
+        boolean mLowBitAmbient;
         boolean mAmbient;
+        boolean mRegisteredTimeZoneReceiver = false;
+
         Calendar mCalendar;
+        SimpleDateFormat mSimpleDateFormat;
+
         final BroadcastReceiver mTimeZoneReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -106,18 +120,17 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
                 invalidate();
             }
         };
+
         float mXOffset;
         float mYOffset;
-        SimpleDateFormat mSimpleDateFormat;
+
         float mTimeSize;
         float mDateSize;
         float mTemperatureSize;
 
-        /**
-         * Whether the display supports fewer bits for each color in ambient mode. When true, we
-         * disable anti-aliasing in ambient mode.
-         */
-        boolean mLowBitAmbient;
+        Bitmap mWeatherIcon;
+        Rect mBitmapSrcRect = new Rect();
+        Rect mBitmapDstRect = new Rect();
 
         @Override
         public void onCreate(SurfaceHolder holder) {
@@ -135,14 +148,22 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             mBackgroundPaint = new Paint();
             mBackgroundPaint.setColor(ContextCompat.getColor(getApplicationContext(), R.color.background));
 
-            mTextPaintBold = createTextPaint(R.color.textColorPrimary, Typeface.DEFAULT_BOLD, true);
-            mTextPaintNormal = createTextPaint(R.color.textColorPrimary, Typeface.DEFAULT, true);
-            mTextPaintSecondary = createTextPaint(R.color.textColorSecondary, Typeface.DEFAULT, true);
-            mTextPaintAmbient = createTextPaint(R.color.textColorPrimary, Typeface.MONOSPACE, false);
+            mTextPaintBold = createTextPaint(R.color.textColorPrimary, Typeface.DEFAULT_BOLD);
+            mTextPaintNormal = createTextPaint(R.color.textColorPrimary, Typeface.DEFAULT);
+            mTextPaintSecondary = createTextPaint(R.color.textColorSecondary, Typeface.DEFAULT);
+            mTextPaintAmbient = createTextPaint(R.color.textColorPrimary, Typeface.MONOSPACE);
             mTextPaintAmbient.setStyle(Paint.Style.STROKE);
 
             mCalendar = Calendar.getInstance();
             mSimpleDateFormat = new SimpleDateFormat("EEE, dd MMM yyyy", Locale.getDefault());
+
+            mBitmapPaint = new Paint();
+            udpateWeatherIcon();
+        }
+
+        private void udpateWeatherIcon() {
+            mWeatherIcon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_snow);
+            mBitmapSrcRect.set(0, 0, mWeatherIcon.getWidth(), mWeatherIcon.getHeight());
         }
 
         @Override
@@ -151,11 +172,11 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             super.onDestroy();
         }
 
-        private Paint createTextPaint(int textColor, Typeface typeface, boolean antialias) {
+        private Paint createTextPaint(int textColor, Typeface typeface) {
             Paint paint = new Paint();
             paint.setColor(ContextCompat.getColor(getApplicationContext(), textColor));
             paint.setTypeface(typeface);
-            paint.setAntiAlias(antialias);
+            paint.setAntiAlias(true);
             return paint;
         }
 
@@ -258,7 +279,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             mCalendar.setTimeInMillis(now);
 
             float centerX = canvas.getWidth() / 2;
-            canvas.drawLine(centerX - 2, 0, centerX + 2, canvas.getHeight(), mTextPaintBold);
+            //    canvas.drawLine(centerX - 2, 0, centerX + 2, canvas.getHeight(), mTextPaintBold);
 
             if (mAmbient) {
                 String text = String.format(Locale.getDefault(), FORMAT_AMBIENT, mCalendar.get(Calendar.HOUR_OF_DAY),
@@ -283,7 +304,28 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
                 mTextPaintSecondary.setTextSize(mDateSize);
                 float measuredDateText = mTextPaintSecondary.measureText(date);
                 canvas.drawText(date, centerX - measuredDateText / 2,
-                        mYOffset + mTimeSize, mTextPaintSecondary);
+                        mYOffset + 3 * mTimeSize / 4, mTextPaintSecondary);
+
+                //draw temperature
+                float yPos = mYOffset + 2 * mTimeSize;
+
+                String highTemp = "25°";
+                mTextPaintBold.setTextSize(mTemperatureSize);
+                float measuredHighTempText = mTextPaintBold.measureText(highTemp);
+                canvas.drawText(highTemp, centerX - measuredHighTempText / 2, yPos, mTextPaintBold);
+
+                float highTempSeparator = measuredHighTempText * 3 / 4;
+
+                String lowTemp = "12°";
+                mTextPaintSecondary.setTextSize(mTemperatureSize);
+                canvas.drawText(lowTemp, centerX + highTempSeparator, yPos, mTextPaintSecondary);
+
+                float newWidth = (mTimeSize / mWeatherIcon.getHeight()) * mWeatherIcon.getWidth();
+                mBitmapDstRect.right = (int) (centerX - highTempSeparator);
+                mBitmapDstRect.top = (int) (yPos - (2 * mTimeSize / 3));
+                mBitmapDstRect.bottom = (int) (yPos + mTimeSize / 3);
+                mBitmapDstRect.left = (int) (centerX - highTempSeparator - newWidth);
+                canvas.drawBitmap(mWeatherIcon, mBitmapSrcRect, mBitmapDstRect, mBitmapPaint);
             }
         }
 
