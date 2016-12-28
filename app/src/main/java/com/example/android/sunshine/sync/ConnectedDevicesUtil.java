@@ -10,6 +10,7 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
 
+import com.example.android.sunshine.BuildConfig;
 import com.example.android.sunshine.data.WeatherContract;
 import com.example.android.sunshine.utilities.NotificationUtils;
 import com.example.android.sunshine.utilities.SunshineDateUtils;
@@ -83,6 +84,10 @@ public class ConnectedDevicesUtil {
             putDataMapRequest.getDataMap().putDouble(KEY_LOW_TEMP, low);
             putDataMapRequest.getDataMap().putAsset(KEY_BITMAP, Asset.createFromBytes(toByteArray(bitmap)));
 
+            if (BuildConfig.DEBUG) {
+                putDataMapRequest.getDataMap().putLong("Time", System.currentTimeMillis());
+            }
+
             PutDataRequest request = putDataMapRequest.asPutDataRequest();
             request.setUrgent();
 
@@ -98,10 +103,9 @@ public class ConnectedDevicesUtil {
                                 Log.e(TAG, "ERROR: failed to putDataItem, status code: "
                                         + dataItemResult.getStatus().getStatusCode());
                             }
+                            mGoogleApiClient.disconnect();
                         }
                     });
-
-            mGoogleApiClient.disconnect();
         }
     }
 
