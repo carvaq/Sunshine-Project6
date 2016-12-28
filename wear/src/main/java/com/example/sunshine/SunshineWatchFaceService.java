@@ -54,7 +54,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
      * Update rate in milliseconds for interactive mode. We update once a second since seconds are
      * displayed in interactive mode.
      */
-    private static final long INTERACTIVE_UPDATE_RATE_MS = TimeUnit.SECONDS.toMillis(1);
+    private static final long UPDATE_RATE_MS = TimeUnit.MINUTES.toMillis(1);
 
     /**
      * Handler message id for updating the time periodically in interactive mode.
@@ -87,8 +87,9 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
     }
 
     private class Engine extends CanvasWatchFaceService.Engine {
-        final String FORMAT_AMBIENT = "%d:%02d";
-        final String FORMAT_HOUR_COLOR = "%d:";
+        final String FORMAT_AMBIENT = "%02d:%02d";
+        final String FORMAT_HOUR = "%02d:";
+        final String FORMAT_MINUTE = "%02d";
         final Handler mUpdateTimeHandler = new EngineHandler(this);
         boolean mRegisteredTimeZoneReceiver = false;
         Paint mBackgroundPaint;
@@ -256,19 +257,32 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             long now = System.currentTimeMillis();
             mCalendar.setTimeInMillis(now);
 
-            if (mAmbient) {
-                String text = String.format(Locale.getDefault(), FORMAT_AMBIENT, mCalendar.get(Calendar.HOUR),
-                        mCalendar.get(Calendar.MINUTE));
-                canvas.drawText(text, mXOffset, mYOffset, mTextPaintAmbient);
-            } else {
-                mTextPaintBold.setTextSize(mTimeSize);
-                String text = String.format(Locale.getDefault(), "%d:%02d:%02d", mCalendar.get(Calendar.HOUR),
-                        mCalendar.get(Calendar.MINUTE), mCalendar.get(Calendar.SECOND));
-                canvas.drawText(text, mXOffset, mYOffset, mTextPaintBold);
+            float centerX = canvas.getWidth() / 2;
+            canvas.drawLine(centerX - 2, 0, centerX + 2, canvas.getHeight(), mTextPaintBold);
 
+            if (mAmbient) {
+                String text = String.format(Locale.getDefault(), FORMAT_AMBIENT, mCalendar.get(Calendar.HOUR_OF_DAY),
+                        mCalendar.get(Calendar.MINUTE));
+                float measuredText = mTextPaintAmbient.measureText(text);
+                float yPos = (canvas.getHeight() - mTimeSize) / 2;
+                canvas.drawText(text, centerX - measuredText / 2, yPos, mTextPaintAmbient);
+            } else {
+                //draw hour
+                String hour = String.format(Locale.getDefault(), FORMAT_HOUR, mCalendar.get(Calendar.HOUR_OF_DAY));
+                mTextPaintBold.setTextSize(mTimeSize);
+                float measuredHourText = mTextPaintBold.measureText(hour);
+                canvas.drawText(hour, centerX - measuredHourText, mYOffset, mTextPaintBold);
+
+                //draw minute
+                String minute = String.format(Locale.getDefault(), FORMAT_MINUTE, mCalendar.get(Calendar.MINUTE));
+                mTextPaintNormal.setTextSize(mTimeSize);
+                canvas.drawText(minute, centerX, mYOffset, mTextPaintNormal);
+
+                //draw date
+                String date = mSimpleDateFormat.format(mCalendar.getTime()).toUpperCase();
                 mTextPaintSecondary.setTextSize(mDateSize);
-                String date = mSimpleDateFormat.format(mCalendar.getTime());
-                canvas.drawText(date, mXOffset,
+                float measuredDateText = mTextPaintSecondary.measureText(date);
+                canvas.drawText(date, centerX - measuredDateText / 2,
                         mYOffset + mTimeSize, mTextPaintSecondary);
             }
         }
@@ -299,8 +313,8 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             invalidate();
             if (shouldTimerBeRunning()) {
                 long timeMs = System.currentTimeMillis();
-                long delayMs = INTERACTIVE_UPDATE_RATE_MS
-                        - (timeMs % INTERACTIVE_UPDATE_RATE_MS);
+                long delayMs = UPDATE_RATE_MS
+                        - (timeMs % UPDATE_RATE_MS);
                 mUpdateTimeHandler.sendEmptyMessageDelayed(MSG_UPDATE_TIME, delayMs);
             }
         }
