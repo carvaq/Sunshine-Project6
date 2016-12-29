@@ -8,6 +8,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.util.Base64;
 import android.util.Log;
 
 import com.example.android.sunshine.BuildConfig;
@@ -18,7 +19,6 @@ import com.example.android.sunshine.utilities.SunshineWeatherUtils;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
-import com.google.android.gms.wearable.Asset;
 import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
@@ -78,11 +78,12 @@ public class ConnectedDevicesUtil {
                     .getSmallArtResourceIdForWeatherCondition(weatherId);
 
             Bitmap bitmap = BitmapFactory.decodeResource(context.getResources(), resourceId);
+            String icon = Base64.encodeToString(toByteArray(bitmap), Base64.DEFAULT);
 
             PutDataMapRequest putDataMapRequest = PutDataMapRequest.create(PATH_WEATHER);
             putDataMapRequest.getDataMap().putDouble(KEY_HIGH_TEMP, high);
             putDataMapRequest.getDataMap().putDouble(KEY_LOW_TEMP, low);
-            putDataMapRequest.getDataMap().putAsset(KEY_BITMAP, Asset.createFromBytes(toByteArray(bitmap)));
+            putDataMapRequest.getDataMap().putString(KEY_BITMAP, icon);
 
             if (BuildConfig.DEBUG) {
                 putDataMapRequest.getDataMap().putLong("Time", System.currentTimeMillis());
@@ -95,6 +96,7 @@ public class ConnectedDevicesUtil {
             if (!mGoogleApiClient.isConnected()) {
                 return;
             }
+
             Wearable.DataApi.putDataItem(mGoogleApiClient, request)
                     .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
                         @Override

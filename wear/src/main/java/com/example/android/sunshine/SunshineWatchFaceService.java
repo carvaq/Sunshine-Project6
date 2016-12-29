@@ -34,6 +34,7 @@ import android.os.Message;
 import android.support.v4.content.ContextCompat;
 import android.support.wearable.watchface.CanvasWatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
+import android.util.Base64;
 import android.view.SurfaceHolder;
 import android.view.WindowInsets;
 
@@ -92,6 +93,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
         final String FORMAT_AMBIENT = "%02d:%02d";
         final String FORMAT_HOUR = "%02d:";
         final String FORMAT_MINUTE = "%02d";
+        final String FORMAT_TEMPERATURE = "%d°";
 
         final Handler mUpdateTimeHandler = new EngineHandler(this);
 
@@ -128,9 +130,13 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
         float mDateSize;
         float mTemperatureSize;
 
+        String mLowTemp;
+        String mHighTemp;
         Bitmap mWeatherIcon;
         Rect mBitmapSrcRect = new Rect();
         Rect mBitmapDstRect = new Rect();
+
+        PreferencesWrapper mPreferencesWrapper;
 
         @Override
         public void onCreate(SurfaceHolder holder) {
@@ -158,12 +164,20 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             mSimpleDateFormat = new SimpleDateFormat("EEE, dd MMM yyyy", Locale.getDefault());
 
             mBitmapPaint = new Paint();
-            updateWeatherIcon();
+            mPreferencesWrapper = new PreferencesWrapper(getApplicationContext());
+            updateWeather();
         }
 
-        private void updateWeatherIcon() {
-            mWeatherIcon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_snow);
-            mBitmapSrcRect.set(0, 0, mWeatherIcon.getWidth(), mWeatherIcon.getHeight());
+        private void updateWeather() {
+            //http://stackoverflow.com/questions/19556433/saving-byte-array-using-sharedpreferences
+            String icon = mPreferencesWrapper.getWeatherIcon();
+            if (icon != null) {
+                byte[] array = Base64.decode(icon, Base64.DEFAULT);
+                mWeatherIcon = BitmapFactory.decodeByteArray(array, 0, array.length);
+                mBitmapSrcRect.set(0, 0, mWeatherIcon.getWidth(), mWeatherIcon.getHeight());
+            }
+            mHighTemp = String.format(Locale.getDefault(), FORMAT_TEMPERATURE, mPreferencesWrapper.getHighTemperature());
+            mLowTemp = String.format(Locale.getDefault(), FORMAT_TEMPERATURE, mPreferencesWrapper.getLowTemperature());
         }
 
         @Override
@@ -258,6 +272,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
                 if (mLowBitAmbient) {
                     mTextPaintAmbient.setAntiAlias(!inAmbientMode);
                 }
+                updateWeather();
                 invalidate();
             }
 
@@ -309,16 +324,14 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
                 //draw temperature
                 float yPos = mYOffset + 2 * mTimeSize;
 
-                String highTemp = "25°";
                 mTextPaintBold.setTextSize(mTemperatureSize);
-                float measuredHighTempText = mTextPaintBold.measureText(highTemp);
-                canvas.drawText(highTemp, centerX - measuredHighTempText / 2, yPos, mTextPaintBold);
+                float measuredHighTempText = mTextPaintBold.measureText(mHighTemp);
+                canvas.drawText(mHighTemp, centerX - measuredHighTempText / 2, yPos, mTextPaintBold);
 
                 float highTempSeparator = measuredHighTempText * 3 / 4;
 
-                String lowTemp = "12°";
                 mTextPaintSecondary.setTextSize(mTemperatureSize);
-                canvas.drawText(lowTemp, centerX + highTempSeparator, yPos, mTextPaintSecondary);
+                canvas.drawText(mLowTemp, centerX + highTempSeparator, yPos, mTextPaintSecondary);
 
                 float newWidth = (mTimeSize / mWeatherIcon.getHeight()) * mWeatherIcon.getWidth();
                 mBitmapDstRect.right = (int) (centerX - highTempSeparator);

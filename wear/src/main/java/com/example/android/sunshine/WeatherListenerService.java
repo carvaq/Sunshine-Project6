@@ -1,12 +1,9 @@
 package com.example.android.sunshine;
 
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.wearable.Asset;
 import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
 import com.google.android.gms.wearable.DataItem;
@@ -24,6 +21,7 @@ import static com.example.Constants.PATH_WEATHER;
 
 public class WeatherListenerService extends WearableListenerService {
 
+    public static final String ACTION_UPDATE_RECEIVED = "update_received";
     private GoogleApiClient mGoogleApiClient;
 
     @Override
@@ -44,7 +42,7 @@ public class WeatherListenerService extends WearableListenerService {
                 return;
             }
         }
-
+        PreferencesWrapper preferencesWrapper = new PreferencesWrapper(getApplicationContext());
         for (DataEvent event : dataEvents) {
             DataItem dataItem = event.getDataItem();
             Uri uri = dataItem.getUri();
@@ -54,9 +52,10 @@ public class WeatherListenerService extends WearableListenerService {
                 DataMap config = dataMapItem.getDataMap();
                 double lowTemp = config.getDouble(KEY_LOW_TEMP);
                 double highTemp = config.getDouble(KEY_HIGH_TEMP);
-                Asset asset = config.getAsset(KEY_BITMAP);
-                byte[] assetData = asset.getData();
-                Bitmap bitmap = BitmapFactory.decodeByteArray(assetData, 0, assetData.length);
+                String icon = config.getString(KEY_BITMAP);
+                preferencesWrapper.saveHighTemperature((int) highTemp);
+                preferencesWrapper.saveLowTemperature((int) lowTemp);
+                preferencesWrapper.saveWeatherIcon(icon);
             }
         }
     }
